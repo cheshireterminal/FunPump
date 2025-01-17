@@ -1,3 +1,134 @@
+Fun Pump Launchpad Smart Contract
+
+A secure and feature-rich Solana smart contract for token launches, vesting, and liquidity management.
+
+## Features
+
+### Token Vesting System
+- Custom vesting schedules for token distribution
+- Time-locked token vesting periods
+- Market cap milestone requirements
+- Start and end time validation
+- Secure token transfer mechanisms
+
+### Token Vault System
+- Secure token storage infrastructure
+- Time-based locking mechanisms
+- Owner-only access control
+- Real-time amount tracking
+- Automated unlock schedules
+
+### Price Curve Management
+- Dynamic market price determination
+- Customizable pricing curves (linear/exponential)
+- Buy/sell operation handling
+- Supply and reserve tracking
+- Liquidity pool management
+
+## Security Features
+
+- Owner verification for critical operations
+- Time-based validation checks
+- Amount validation
+- Market cap requirement checks
+- Protected token transfers
+- Built-in slippage protection
+- Comprehensive error handling
+- Event logging for all operations
+
+## Core Functions
+
+### Project Owner Operations
+```rust
+initialize_vesting()  // Set up vesting schedule
+initialize_vault()    // Create secure token storage
+lock_tokens()        // Lock tokens in vault
+Trading Operations
+rustCopybuy_tokens()     // Purchase tokens
+sell_tokens()    // Sell tokens
+Vesting Controls
+rustCopylock_tokens_for_vesting()   // Lock tokens in vesting contract
+unlock_vested_tokens()      // Release tokens after conditions met
+Safety Mechanisms
+
+Minimum/maximum vesting periods
+Market cap thresholds
+Owner authorization checks
+Balance validations
+Protected transfer operations
+Comprehensive event logging
+
+Anti-Rug Pull Measures
+
+Locked Liquidity
+Vesting Schedules
+Market Cap Requirements
+Time Locks
+Owner Verification
+
+Event Tracking
+The contract tracks multiple events including:
+
+Vesting initialization
+Token locks/unlocks
+Trading activities
+System initialization
+State changes
+
+Error Handling
+Comprehensive error handling for:
+
+Authorization failures
+Timing violations
+Balance issues
+Market cap requirements
+Calculation errors
+
+Technical Implementation
+Vesting Structure
+rustCopypub struct Vesting {
+    pub owner: Pubkey,
+    pub token_mint: Pubkey,
+    pub amount: u64,
+    pub start_time: i64,
+    pub end_time: i64,
+    pub target_market_cap: u64,
+    pub is_locked: bool,
+    pub bump: u8,
+}
+Vault Structure
+rustCopypub struct Vault {
+    pub owner: Pubkey,
+    pub bump: u8,
+    pub locked_amount: u64,
+    pub locked_until: i64,
+}
+Usage
+
+Deploy the smart contract
+Initialize vault and vesting schedules
+Configure pricing curves
+Set up token distribution parameters
+Enable trading functions
+
+Best Practices
+
+Always verify transaction signatures
+Monitor market cap requirements
+Review vesting schedules
+Check token balances
+Verify owner permissions
+
+License
+[Add your license information here]
+Contributing
+[Add contribution guidelines here]
+Support
+[Add support information here]
+
+
+
+
 FunPump Smart Contract ## Overview
 
 This FunPump.Ai Solana Anchor program provides mechanisms to:
