@@ -1,0 +1,188 @@
+Below is a short overview of what these new enums represent and how they might fit into your broader program. The snippet you shared simply declares some new enumeration types that can be used to specify different vesting schedules, token stream distributions, and bonding‑curve shapes. You’ll likely want to integrate them into your existing instructions and account data to achieve more advanced, customized behavior.
+
+---
+
+## 1. New Enumerations
+
+### `VestingScheduleType`
+
+```rust
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq)]
+pub enum VestingScheduleType {
+    Linear,
+    Staggered,
+    Cliff,
+    CustomMilestone,
+}
+```
+
+**Possible Use‑Cases**:
+- **Linear**: Tokens unlock at a constant rate over a set period (e.g., 1% per day).
+- **Staggered**: Unlock happens at intervals or “tranches” (e.g., 25% unlock every quarter).
+- **Cliff**: A single date (the “cliff”) after which some or all tokens become unlocked.
+- **CustomMilestone**: A more arbitrary set of triggers or external events that dictate unlocks.
+
+In your **Vesting** account or instructions, you might store a `vesting_schedule_type: VestingScheduleType` field. Then, when you handle “unlock” logic, you check which variant it is and apply the corresponding calculation to determine how many tokens can be unlocked at the current time.
+
+### `StreamType`
+
+```rust
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq)]
+pub enum StreamType {
+    Linear,
+    Exponential,
+    Custom,
+}
+```
+
+**Possible Use‑Cases**:
+- **Linear**: Flow of tokens (or payments) is uniform per unit of time.
+- **Exponential**: Flow changes exponentially—perhaps it starts small and grows quickly, or vice versa.
+- **Custom**: You define your own curve or formula.
+
+This `StreamType` might be used for something like periodic reward streams or revenue sharing, not necessarily limited to vesting. You might keep track of how tokens or funds “stream” from one account to another over time.
+
+### `CurveType`
+
+```rust
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq)]
+pub enum CurveType {
+    Linear,
+    Exponential,
+    Sigmoid,
+    Custom,
+}
+```
+
+**Possible Use‑Cases**:
+- **Linear**: A direct proportion (simple slope).  
+- **Exponential**: Grows or decays at an exponential rate.
+- **Sigmoid**: Often used to model bonding curves that start flat, accelerate, then flatten again.
+- **Custom**: Any user‑defined curve or advanced function.
+
+If you integrate a **bonding curve** into your token sale or distribution mechanism, you can store a `CurveType` to indicate which formula the program should use to price tokens or to determine how many tokens are released based on external inputs (e.g., how much SOL was paid in a purchase).
+
+---
+
+## 2. Integrating These Types into Your Program
+
+Since you already have instructions for **vesting** and **locking** tokens (from the prior conversation), here’s how you might incorporate these enumerations:
+
+1. **Extend Your Vesting Account**  
+   Add a field like:
+   ```rust
+   #[account]
+   pub struct Vesting {
+       pub owner: Pubkey,
+       pub token_mint: Pubkey,
+       pub amount: u64,
+       pub start_time: i64,
+       pub end_time: i64,
+       pub target_market_cap: u64,
+       pub is_locked: bool,
+       pub bump: u8,
+
+       // New
+       pub vesting_type: VestingScheduleType,
+       // Optionally store more data needed by the schedule
+   }
+   ```
+   Now, whenever you call `initialize_vesting`, you can pass in the desired `VestingScheduleType` (e.g., `Cliff` or `Linear`) to store in this field.
+
+2. **Adjust the Unlock Logic**  
+   When a user tries to unlock vested tokens, you can do something like:
+   ```rust
+   match vesting.vesting_type {
+       VestingScheduleType::Linear => {
+           // compute how many tokens unlocked linearly so far
+       },
+       VestingScheduleType::Staggered => {
+           // check which “tranche” we’re in now
+       },
+       VestingScheduleType::Cliff => {
+           // cliff logic - if current_time < end_time => zero unlocked, else everything
+       },
+       VestingScheduleType::CustomMilestone => {
+           // custom logic, possibly referencing an external oracle or event data
+       },
+   }
+   ```
+   If partial unlocks are allowed, you would do a partial transfer, and keep track of how much remains locked.
+
+3. **Incorporate `StreamType`**  
+   If you have an instruction that streams tokens or funds, store a `stream_type: StreamType` inside that account or pass it as an argument. The actual streaming logic might be in a recurring instruction that claims newly vested tokens each day or block, and the code would differentiate between `Linear`, `Exponential`, or `Custom` streaming calculations.
+
+4. **Integrate `CurveType` in Your Bonding Sale Logic**  
+   For a bonding curve approach, you might create a new account:
+   ```rust
+   #[account]
+   pub struct BondingCurveData {
+       pub curve_type: CurveType,
+       pub current_supply: u64,
+       pub base_price: u64,
+       // ... other fields relevant to your curve
+   }
+   ```
+   Then in an instruction like `buy_tokens_with_curve`, you:
+   - Read `bonding_curve_data.curve_type`  
+   - Perform the appropriate math to figure out price or number of tokens.  
+   - Possibly lock or vest those tokens automatically if you want them time‑restricted.
+
+---
+
+## 3. High-Level Example
+
+Below is a **pseudo‑instruction** that demonstrates how one might set up a vesting schedule with a chosen type:
+
+```rust
+pub fn initialize_vesting_with_type(
+    ctx: Context<InitializeVesting>,
+    amount: u64,
+    start_time: i64,
+    end_time: i64,
+    target_market_cap: u64,
+    vesting_type: VestingScheduleType,
+) -> Result<()> {
+    // 1. Basic checks like in your existing code
+    require!(amount > MINIMUM_AMOUNT, CustomError::InvalidVestingAmount);
+    require!(end_time > start_time, CustomError::InvalidTimeParameters);
+
+    // 2. Set fields
+    let vesting = &mut ctx.accounts.vesting;
+    vesting.owner = ctx.accounts.owner.key();
+    vesting.token_mint = ctx.accounts.token_mint.key();
+    vesting.amount = amount;
+    vesting.start_time = start_time;
+    vesting.end_time = end_time;
+    vesting.target_market_cap = target_market_cap;
+    vesting.is_locked = true;
+    vesting.bump = *ctx.bumps.get("vesting").unwrap();
+    
+    // NEW: store the vesting_type
+    vesting.vesting_type = vesting_type;
+
+    emit!(VestingInitialized {
+        owner: vesting.owner,
+        amount,
+        start_time,
+        end_time,
+    });
+    Ok(())
+}
+```
+
+Then, in your **unlock** or **claim** function, you can reference `vesting.vesting_type` to apply different logic.
+
+---
+
+## 4. Conclusion
+
+- **The new enumerations** (`VestingScheduleType`, `StreamType`, `CurveType`) allow you to define more flexible token release schedules, streaming rules, and bonding curve shapes.  
+- **Usage**: You’ll store these values in your on‑chain accounts (or pass them into instructions) and write logic to handle each variant.  
+- **Advanced Features** like partial unlocks, custom cliff & milestone schedules, or dynamic bonding curves can all be implemented by branching on these enums.  
+- **Best Practices**: 
+  - Keep the logic for each variant in a match statement or separate helper functions for readability.  
+  - Ensure your program checks that partial claims or multi‑step unlocking are handled securely (e.g., track how many tokens have already been claimed).  
+  - For bonding curves, combine these fields with a robust method of reading oracles (if needed) or storing on‑chain data (like total minted supply) to drive the curve calculations.
+
+In short, these enums let you build more sophisticated token distribution scenarios. You can use them for time locks with different unlocking patterns, streaming payments, or dynamic supply curves. The key is integrating them carefully into your existing program instructions and account state so that your logic respects each variant’s unique rules.
